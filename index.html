@@ -1,0 +1,427 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Control Avanzado de Cuentas Streaming</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script defer src="https://unpkg.com/alpinejs@3.x.x/dist/cdn.min.js"></script>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+</head>
+<body class="bg-gray-100 min-h-screen p-4" x-data="app">
+  <div class="max-w-6xl mx-auto bg-white p-6 rounded shadow-lg">
+    <h1 class="text-2xl font-bold mb-6 text-center text-blue-700">
+      <i class="fas fa-film mr-2"></i>Control de Cuentas Streaming
+    </h1>
+
+    <!-- Formulario de cuenta -->
+    <form @submit.prevent="guardarCuenta" class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6 p-4 bg-gray-50 rounded border">
+      <div class="relative">
+        <label class="block text-sm font-medium text-gray-700 mb-1">Correo principal</label>
+        <input type="email" placeholder="ejemplo@dominio.com" x-model="form.correo" class="p-2 border rounded w-full" required>
+      </div>
+      
+      <div class="relative">
+        <label class="block text-sm font-medium text-gray-700 mb-1">Plataforma</label>
+        <input type="text" placeholder="Netflix, Disney+, etc." x-model="form.plataforma" class="p-2 border rounded w-full" required>
+      </div>
+      
+      <div class="relative">
+        <label class="block text-sm font-medium text-gray-700 mb-1">Contraseña</label>
+        <div class="relative">
+          <input :type="showPassword ? 'text' : 'password'" placeholder="Contraseña" x-model="form.contrasena" class="p-2 border rounded w-full" required>
+          <button type="button" @click="showPassword = !showPassword" class="absolute right-2 top-2 text-gray-500">
+            <i :class="showPassword ? 'fas fa-eye-slash' : 'fas fa-eye'"></i>
+          </button>
+        </div>
+      </div>
+      
+      <div class="relative">
+        <label class="block text-sm font-medium text-gray-700 mb-1">Perfil</label>
+        <input type="text" placeholder="Perfil 1, Perfil 2, etc." x-model="form.perfil" class="p-2 border rounded w-full" required>
+      </div>
+      
+      <div class="relative">
+        <label class="block text-sm font-medium text-gray-700 mb-1">PIN</label>
+        <input type="text" placeholder="Opcional" x-model="form.pin" class="p-2 border rounded w-full">
+      </div>
+      
+      <div class="relative">
+        <label class="block text-sm font-medium text-gray-700 mb-1">Fecha de renovación</label>
+        <input type="date" x-model="form.renovacion" class="p-2 border rounded w-full" required>
+      </div>
+      
+      <div class="relative">
+        <label class="block text-sm font-medium text-gray-700 mb-1">Estado</label>
+        <select x-model="form.estado" class="p-2 border rounded w-full" @change="toggleCliente">
+          <option value="DISPONIBLE">Disponible</option>
+          <option value="VENDIDA">Vendida</option>
+        </select>
+      </div>
+      
+      <template x-if="form.estado === 'VENDIDA'">
+        <div class="relative">
+          <label class="block text-sm font-medium text-gray-700 mb-1">Nombre del Cliente</label>
+          <input type="text" placeholder="Nombre completo" x-model="form.nombre" class="p-2 border rounded w-full">
+        </div>
+      </template>
+      
+      <template x-if="form.estado === 'VENDIDA'">
+        <div class="relative">
+          <label class="block text-sm font-medium text-gray-700 mb-1">WhatsApp</label>
+          <input type="text" placeholder="Número de contacto" x-model="form.numero" class="p-2 border rounded w-full">
+        </div>
+      </template>
+      
+      <input type="hidden" x-model="form.id">
+      
+      <div class="col-span-full flex justify-end gap-2">
+        <button type="button" @click="resetForm" class="bg-gray-500 text-white px-4 py-2 rounded hover:bg-gray-600">
+          <i class="fas fa-times mr-1"></i> Cancelar
+        </button>
+        <button type="submit" class="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700">
+          <i class="fas fa-save mr-1"></i>
+          <span x-text="form.id ? 'Actualizar' : 'Guardar'"></span>
+        </button>
+      </div>
+    </form>
+
+    <!-- Contadores y filtros -->
+    <div class="flex flex-wrap justify-between gap-4 mb-4">
+      <div class="flex gap-4">
+        <div class="text-sm bg-green-100 text-green-800 px-4 py-2 rounded flex items-center">
+          <i class="fas fa-check-circle mr-1"></i> Vendidas: <span x-text="contador('VENDIDA')" class="font-bold ml-1"></span>
+        </div>
+        <div class="text-sm bg-yellow-100 text-yellow-800 px-4 py-2 rounded flex items-center">
+          <i class="fas fa-store mr-1"></i> Disponibles: <span x-text="contador('DISPONIBLE')" class="font-bold ml-1"></span>
+        </div>
+        <div class="text-sm bg-purple-100 text-purple-800 px-4 py-2 rounded flex items-center">
+          <i class="fas fa-exclamation-circle mr-1"></i> Por renovar: <span x-text="contadorRenovaciones()" class="font-bold ml-1"></span>
+        </div>
+      </div>
+      
+      <div class="flex gap-2">
+        <select x-model="filtroPlataforma" class="p-2 border rounded text-sm">
+          <option value="">Todas las plataformas</option>
+          <template x-for="plataforma in plataformasUnicas" :key="plataforma">
+            <option x-text="plataforma" :value="plataforma"></option>
+          </template>
+        </select>
+        
+        <select x-model="filtroEstado" class="p-2 border rounded text-sm">
+          <option value="">Todos los estados</option>
+          <option value="DISPONIBLE">Disponibles</option>
+          <option value="VENDIDA">Vendidas</option>
+        </select>
+      </div>
+    </div>
+
+    <!-- Lista de cuentas organizadas por correo -->
+    <template x-if="cuentasFiltradas.length === 0">
+      <div class="text-center p-8 bg-gray-50 rounded border">
+        <i class="fas fa-inbox text-4xl text-gray-300 mb-2"></i>
+        <p class="text-gray-500">No hay cuentas registradas.</p>
+        <p class="text-sm text-gray-400 mt-2">Comienza agregando una nueva cuenta usando el formulario superior.</p>
+      </div>
+    </template>
+
+    <div class="space-y-6">
+      <template x-for="(grupo, correo) in agruparPorCorreo()" :key="correo">
+        <div class="border rounded-lg overflow-hidden">
+          <div class="bg-gray-800 text-white p-3 font-semibold flex justify-between items-center">
+            <div>
+              <i class="fas fa-envelope mr-2"></i>
+              <span x-text="correo"></span>
+              <span class="text-gray-300 ml-2" x-text="'(' + grupo.length + ')'"></span>
+            </div>
+            <button @click="copiarCorreo(correo)" class="text-gray-300 hover:text-white">
+              <i class="fas fa-copy"></i>
+            </button>
+          </div>
+          <div class="space-y-4 p-4">
+            <template x-for="(cuenta, index) in grupo" :key="cuenta.id">
+              <details class="bg-gray-50 p-4 rounded border shadow" x-data="{ isEditing: false }" x-init="isEditing = cuenta.id === form.id">
+                <summary class="cursor-pointer font-semibold text-lg flex justify-between items-center">
+                  <span x-text="cuenta.plataforma + ' - Perfil ' + cuenta.perfil"></span>
+                  <span 
+                    :class="{
+                      'bg-green-100 text-green-800 px-2 py-1 rounded text-sm': cuenta.estado === 'VENDIDA' && !mostrarRenovar(cuenta.renovacion),
+                      'bg-yellow-100 text-yellow-800 px-2 py-1 rounded text-sm': cuenta.estado === 'DISPONIBLE',
+                      'bg-purple-100 text-purple-800 px-2 py-1 rounded text-sm': mostrarRenovar(cuenta.renovacion)
+                    }" 
+                    x-text="mostrarRenovar(cuenta.renovacion) ? 'POR RENOVAR' : cuenta.estado">
+                  </span>
+                </summary>
+                <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4 mt-4">
+                  <div class="bg-white p-3 rounded border">
+                    <div class="text-xs text-gray-500 mb-1">Correo</div>
+                    <div x-text="cuenta.correo" class="font-medium"></div>
+                  </div>
+                  
+                  <div class="bg-white p-3 rounded border">
+                    <div class="text-xs text-gray-500 mb-1">Contraseña</div>
+                    <div class="flex items-center">
+                      <span x-text="cuenta.contrasena" class="font-medium mr-2"></span>
+                      <button @click="copiarTexto(cuenta.contrasena)" class="text-gray-500 hover:text-blue-600">
+                        <i class="fas fa-copy text-sm"></i>
+                      </button>
+                    </div>
+                  </div>
+                  
+                  <div class="bg-white p-3 rounded border">
+                    <div class="text-xs text-gray-500 mb-1">PIN</div>
+                    <div x-text="cuenta.pin || 'N/A'" class="font-medium"></div>
+                  </div>
+                  
+                  <template x-if="cuenta.estado === 'VENDIDA'">
+                    <div class="bg-white p-3 rounded border">
+                      <div class="text-xs text-gray-500 mb-1">Cliente</div>
+                      <div x-text="cuenta.nombre || 'N/A'" class="font-medium"></div>
+                    </div>
+                  </template>
+                  
+                  <template x-if="cuenta.estado === 'VENDIDA'">
+                    <div class="bg-white p-3 rounded border">
+                      <div class="text-xs text-gray-500 mb-1">WhatsApp</div>
+                      <div x-text="cuenta.numero || 'N/A'" class="font-medium"></div>
+                    </div>
+                  </template>
+                  
+                  <div class="bg-white p-3 rounded border">
+                    <div class="text-xs text-gray-500 mb-1">Renovación</div>
+                    <div :class="{'text-red-600 font-bold': mostrarRenovar(cuenta.renovacion)}" x-text="cuenta.renovacion" class="font-medium"></div>
+                  </div>
+                </div>
+                <div class="flex flex-wrap gap-2 mt-4">
+                  <template x-if="mostrarRenovar(cuenta.renovacion)">
+                    <a :href="renovacionLink(cuenta.id)" target="_blank" class="bg-purple-600 text-white px-4 py-2 rounded hover:bg-purple-700">
+                      <i class="fas fa-sync-alt mr-1"></i> Renovar
+                    </a>
+                  </template>
+                  <template x-if="!mostrarRenovar(cuenta.renovacion) && cuenta.estado === 'VENDIDA'">
+                    <a :href="whatsappLink(cuenta.id)" target="_blank" class="bg-emerald-500 text-white px-4 py-2 rounded hover:bg-emerald-600">
+                      <i class="fab fa-whatsapp mr-1"></i> Enviar
+                    </a>
+                  </template>
+                  <button @click="editar(cuenta.id)" class="bg-yellow-500 text-white px-4 py-2 rounded hover:bg-yellow-600">
+                    <i class="fas fa-edit mr-1"></i> Editar
+                  </button>
+                  <button @click="eliminar(cuenta.id)" class="bg-red-500 text-white px-4 py-2 rounded hover:bg-red-600">
+                    <i class="fas fa-trash-alt mr-1"></i> Eliminar
+                  </button>
+                  <button @click="copiarCredenciales(cuenta)" class="bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-600">
+                    <i class="fas fa-copy mr-1"></i> Copiar
+                  </button>
+                </div>
+              </details>
+            </template>
+          </div>
+        </div>
+      </template>
+    </div>
+  </div>
+
+  <script>
+    document.addEventListener('alpine:init', () => {
+      Alpine.data('app', () => ({
+        cuentas: JSON.parse(localStorage.getItem('cuentas')) || [],
+        form: {
+          id: null,
+          plataforma: '', 
+          correo: '', 
+          contrasena: '', 
+          perfil: '', 
+          pin: '', 
+          estado: 'DISPONIBLE', 
+          nombre: '', 
+          numero: '', 
+          renovacion: ''
+        },
+        showPassword: false,
+        filtroPlataforma: '',
+        filtroEstado: '',
+        
+        init() {
+          // Verificar renovaciones cada hora
+          setInterval(() => this.verificarRenovaciones(), 3600000);
+          this.verificarRenovaciones();
+        },
+        
+        // Computed properties
+        get cuentasFiltradas() {
+          return this.cuentas.filter(c => {
+            const cumplePlataforma = !this.filtroPlataforma || c.plataforma === this.filtroPlataforma;
+            const cumpleEstado = !this.filtroEstado || c.estado === this.filtroEstado;
+            return cumplePlataforma && cumpleEstado;
+          });
+        },
+        
+        get plataformasUnicas() {
+          return [...new Set(this.cuentas.map(c => c.plataforma))].sort();
+        },
+        
+        // Agrupa cuentas por correo
+        agruparPorCorreo() {
+          const cuentasFiltradas = this.cuentasFiltradas;
+          return cuentasFiltradas.reduce((grupos, cuenta) => {
+            if (!grupos[cuenta.correo]) {
+              grupos[cuenta.correo] = [];
+            }
+            grupos[cuenta.correo].push(cuenta);
+            return grupos;
+          }, {});
+        },
+        
+        // Renovaciones
+        verificarRenovaciones() {
+          // Solo para mantener la estructura, ya no envía notificaciones
+          const hoy = new Date();
+          const cuentasPorRenovar = this.cuentas.filter(c => 
+            c.estado === 'VENDIDA' && this.mostrarRenovar(c.renovacion)
+          );
+          
+          // Podrías implementar notificaciones visuales aquí si lo deseas
+        },
+        
+        // CRUD Cuentas
+        guardarCuenta() {
+          if (!this.form.id) {
+            // Nueva cuenta
+            this.form.id = Date.now().toString();
+            this.cuentas.push({ ...this.form });
+          } else {
+            // Editar cuenta existente
+            const index = this.cuentas.findIndex(c => c.id === this.form.id);
+            if (index !== -1) {
+              this.cuentas[index] = { ...this.form };
+            }
+          }
+          
+          localStorage.setItem('cuentas', JSON.stringify(this.cuentas));
+          this.resetForm();
+        },
+        
+        editar(id) {
+          const cuenta = this.cuentas.find(c => c.id === id);
+          if (cuenta) {
+            this.form = { ...cuenta };
+            // Hacer scroll al formulario
+            document.querySelector('form').scrollIntoView({ behavior: 'smooth' });
+          }
+        },
+        
+        eliminar(id) {
+          if (confirm('¿Estás seguro de eliminar esta cuenta permanentemente?')) {
+            this.cuentas = this.cuentas.filter(c => c.id !== id);
+            localStorage.setItem('cuentas', JSON.stringify(this.cuentas));
+          }
+        },
+        
+        // Helpers
+        whatsappLink(id) {
+          const c = this.cuentas.find(cuenta => cuenta.id === id);
+          if (!c) return '#';
+          
+          const mensaje = `🎬 Hola ${c.nombre.toUpperCase()}!%0A%0A` +
+            `Aquí tienes los datos de tu cuenta de *${c.plataforma}*:%0A` +
+            `📧 Correo: ${c.correo}%0A` +
+            `🔑 Contraseña: ${c.contrasena}%0A` +
+            `👤 Perfil: ${c.perfil}%0A` +
+            `🔐 PIN: ${c.pin}%0A` +
+            `📅 Renovación: ${c.renovacion}%0A%0A` +
+            `_Si tienes algún problema contáctanos aquí:_%0Ahttps://fullstreamrec.com/contacto`;
+
+          return `https://wa.me/593${c.numero.replace(/[^\d]/g, '')}?text=${mensaje}`;
+        },
+        
+        renovacionLink(id) {
+          const c = this.cuentas.find(cuenta => cuenta.id === id);
+          if (!c) return '#';
+          
+          const mensaje = `*🔔 Aviso de Renovación*%0A` +
+            `*👤 Usuario:* ${c.nombre}%0A` +
+            `*📅 Fecha de vencimiento:* ${c.renovacion}%0A%0A` +
+            `Estimado cliente, la siguiente cuenta está próxima a vencer:%0A%0A` +
+            `🎬 *${c.plataforma.toUpperCase()}*%0A` +
+            `📧 ${c.correo}%0A` +
+            `👤 *Perfil:* ${c.perfil}%0A%0A` +
+            `*📆 Próximos vencimientos:*%0A` +
+            `Recuerda que es necesario realizar las renovaciones *hasta 24 horas antes* de la fecha indicada para evitar el corte de sus cuentas.%0A%0A` +
+            `💡 *¿Cómo renovar?*%0A` +
+            `✅Envíame la cuenta que deseas renovar.%0A` +
+            `✅Adjunta el comprobante de pago correspodiente.%0A%0A` +
+            `🛍️ *Todos los precios están actualizados en la tienda:* https://fullstreamrec.com/%0A%0A` +
+            `Si no deseas renovar, no es necesario hacer nada.%0A%0A` +
+            `🙏 ¡Gracias por tu confianza y que tengas un excelente día! ✨`;
+          return `https://wa.me/593${c.numero.replace(/[^\d]/g, '')}?text=${mensaje}`;
+        },
+        
+        mostrarRenovar(fecha) {
+          if (!fecha) return false;
+          const hoy = new Date();
+          const f = new Date(fecha);
+          f.setDate(f.getDate() - 1); // Un día antes
+          return hoy >= f;
+        },
+        
+        contador(tipo) {
+          return this.cuentas.filter(c => c.estado === tipo).length;
+        },
+        
+        contadorRenovaciones() {
+          return this.cuentas.filter(c => 
+            c.estado === 'VENDIDA' && this.mostrarRenovar(c.renovacion)
+          ).length;
+        },
+        
+        resetForm() {
+          this.form = { 
+            id: null,
+            plataforma: '', 
+            correo: '', 
+            contrasena: '', 
+            perfil: '', 
+            pin: '', 
+            estado: 'DISPONIBLE', 
+            nombre: '', 
+            numero: '', 
+            renovacion: '' 
+          };
+          this.showPassword = false;
+        },
+        
+        toggleCliente() {
+          if (this.form.estado === 'DISPONIBLE') {
+            this.form.nombre = '';
+            this.form.numero = '';
+          }
+        },
+        
+        // Nuevas funciones de utilidad
+        copiarTexto(texto) {
+          if (!texto) return;
+          navigator.clipboard.writeText(texto);
+          alert('Texto copiado al portapapeles');
+        },
+        
+        copiarCorreo(correo) {
+          navigator.clipboard.writeText(correo);
+          alert('Correo copiado al portapapeles');
+        },
+        
+        copiarCredenciales(cuenta) {
+          const texto = `Plataforma: ${cuenta.plataforma}\n` +
+            `Correo: ${cuenta.correo}\n` +
+            `Contraseña: ${cuenta.contrasena}\n` +
+            `Perfil: ${cuenta.perfil}\n` +
+            `PIN: ${cuenta.pin || 'N/A'}\n` +
+            `Renovación: ${cuenta.renovacion}`;
+          
+          navigator.clipboard.writeText(texto);
+          alert('Credenciales copiadas al portapapeles');
+        }
+      }))
+    })
+  </script>
+</body>
+</html>
